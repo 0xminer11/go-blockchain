@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const MINING_DIFFICULTY = 3
+
 type Block struct {
 	nonce        int
 	previousHash [32]byte
@@ -108,6 +110,36 @@ func (b *Block) Hash() [32]byte {
 	//return sha256.Sum256([]byte("hello"))
 }
 
+func (bc *Blockchain) CopyTransaction() []*Transaction {
+	transactions := make([]*Transaction, 0)
+	for _, t := range bc.transactionPool {
+		transactions = append(transactions,
+			NewTransaction(
+				t.senderBlockchainAddress,
+				t.reciverBlockchainAddress,
+				t.value))
+	}
+	return transactions
+}
+
+//func (bc *Blockchain) ValidProof(nonce int, previousHash [32]byte, txs []*Transaction, difficulty int) bool {
+//	zeros := strings.Repeat("0", difficulty)
+//	guessBlock := Block{nonce, previousHash, 0, txs}
+//	guessHashStr := fmt.Sprintf("%x", guessBlock.Hash())
+//	return guessHashStr[:difficulty] == zeros
+//}
+
+func (bc *Blockchain) ProofOfStake() int {
+	//transactions := bc.CopyTransaction()
+	previousnonce := bc.LastBlock().nonce
+	return previousnonce + 1
+
+	//for !bc.ValidProof(nonce, previousHash, transactions, MINING_DIFFICULTY) {
+	//	nonce += 1
+	//}
+	//return nonce
+}
+
 func init() {
 	log.SetPrefix("Blockchain :")
 }
@@ -116,19 +148,19 @@ func main() {
 	bc := newBlockchain()
 	log.Println("Block Mined..✅")
 	bc.print()
-
+	//nonce := bc.ProofOfWork()
 	hash := bc.LastBlock().Hash()
 	bc.createBlock(1, hash)
 	bc.print()
-
+	nonce := bc.ProofOfStake()
 	bc.AddTransaction("A", "B", 1.0)
 	bc.AddTransaction("A", "B", 2.0)
 	hash = bc.LastBlock().Hash()
-	bc.createBlock(2, hash)
+	bc.createBlock(nonce, hash)
 	bc.print()
-
+	nonce = bc.ProofOfStake()
 	hash = bc.LastBlock().Hash()
-	bc.createBlock(3, hash)
+	bc.createBlock(nonce, hash)
 	bc.print()
 
 }
