@@ -4,12 +4,46 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"github.com/btcsuite/btcutil/base58"
+	"golang.org/x/crypto/ripemd160"
+	"math/big"
 )
 
 type Wallet struct {
-	privateKey *ecdsa.PrivateKey
-	publicKey  *ecdsa.PublicKey
+	privateKey        *ecdsa.PrivateKey
+	publicKey         *ecdsa.PublicKey
+	blockchainAddress string
+}
+
+type Transaction struct {
+	senderPrivateKey           *ecdsa.PrivateKey
+	senderPublicKey            *ecdsa.PublicKey
+	senderBlockchainAddress    string
+	recipientBlockchainAddress string
+	value                      float32
+}
+
+type Signature struct {
+	R *big.Int
+	S *big.Int
+}
+
+func NewTransaction(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, sender string, recipient string, value float32) *Transaction {
+	return &Transaction{privateKey, publicKey, sender, recipient, value}
+}
+
+func (t *Transaction) GenerateSignature() *Signature {
+	m, _ := json.Marshal(t)
+	h := sha256.Sum256([]byte(m))
+	r, s, _ := ecdsa.Sign(rand.Reader, t.senderPrivateKey, h[:])
+	return &Signature{r, s}
+}
+
+func (s *Signature) String() string {
+	return fmt.Sprintf("%x%x", s.R, s.S)
 }
 
 func NewWallet() *Wallet {
@@ -17,7 +51,49 @@ func NewWallet() *Wallet {
 	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	w.privateKey = privateKey
 	w.publicKey = &privateKey.PublicKey
+
+	h2 := sha256.New()
+	h2.Write(w.publicKey.X.Bytes())
+	h2.Write(w.publicKey.Y.Bytes())
+	digest2 := h2.Sum(nil)
+
+	h3 := ripemd160.New()
+	h3.Write(digest2)
+	digest3 := h3.Sum(nil)
+
+	vd4 := make([]byte, 21)
+	vd4[0] = 0x00
+	copy(vd4[1:], digest3)
+
+	h5 := sha256.New()
+	h5.Write(vd4)
+	digest5 := h5.Sum(nil)
+
+	h6 := sha256.New()
+	h6.Write(digest5)
+	digest6 := h6.Sum(nil)
+
+	chsum := digest6[:4]
+
+	dc8 := make([]byte, 25)
+	copy(dc8[:21], vd4[:])
+	copy(dc8[21:], chsum[:])
+
+	address := base58.Encode(dc8)
+	w.blockchainAddress = address
 	return w
+}
+
+func (w *Wallet) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		PrivateKey        string `json:"private_key"`
+		PublicKey         string `json:"public_key"`
+		BlockchainAddress string `json:"blockchain_address"`
+	}{
+		PrivateKey:        w.PrivateKeyStr(),
+		PublicKey:         w.PublicKeyStr(),
+		BlockchainAddress: w.BlockchainAddress(),
+	})
 }
 
 func (w *Wallet) PrivateKey() *ecdsa.PrivateKey {
@@ -34,4 +110,8 @@ func (w *Wallet) PrivateKeyStr() string {
 
 func (w *Wallet) PublicKeyStr() string {
 	return fmt.Sprintf("%x%x", w.publicKey.X.Bytes(), w.publicKey.Y.Bytes())
+}
+
+func (w *Wallet) BlockchainAddress() string {
+	return w.blockchainAddress
 }
