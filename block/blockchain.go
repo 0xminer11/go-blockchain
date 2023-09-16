@@ -1,6 +1,8 @@
-package main
+package block
 
 import (
+	"blockchain.com/utils"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -9,7 +11,10 @@ import (
 	"time"
 )
 
-const MINING_DIFFICULTY = 3
+const (
+	MINING_DIFFICULTY = 3
+	MINING_SENDER     = "svs"
+)
 
 type Block struct {
 	nonce        int
@@ -22,6 +27,14 @@ type Transaction struct {
 	senderBlockchainAddress  string
 	reciverBlockchainAddress string
 	value                    float32
+}
+
+func NewBlockchain(blockchainAddress string) *Blockchain {
+	b := &Block{}
+	bc := new(Blockchain)
+	bc.blockchainAddress = blockchainAddress
+	bc.createBlock(0, b.Hash())
+	return bc
 }
 
 func NewTransaction(_sender string, _reciver string, _value float32) *Transaction {
@@ -66,8 +79,9 @@ func (b *Block) print() {
 }
 
 type Blockchain struct {
-	transactionPool []*Transaction
-	chain           []*Block
+	transactionPool   []*Transaction
+	chain             []*Block
+	blockchainAddress string
 }
 
 func newBlockchain() *Blockchain {
@@ -91,9 +105,22 @@ func (bc *Blockchain) createBlock(nonce int, previousHash [32]byte) *Block {
 	return b
 }
 
-func (bc *Blockchain) AddTransaction(_sender string, _reciver string, _value float32) {
-	t := NewTransaction(_sender, _reciver, _value)
-	bc.transactionPool = append(bc.transactionPool, t)
+func (bc *Blockchain) AddTransaction(_sender string, _receiver string, _value float32, senderPublicKey *ecdsa.PublicKey, s *utils.Signature) bool {
+
+	t := NewTransaction(_sender, _receiver, _value)
+
+	if _sender == MINING_SENDER {
+		bc.transactionPool = append(bc.transactionPool, t)
+		return true
+	}
+
+	if bc.verifyTransactionSignature(senderPublicKey, s, t) {
+		bc.transactionPool = append(bc.transactionPool, t)
+		return true
+	} else {
+		log.Println("TX : failed to verify")
+	}
+	return false
 }
 
 func (bc *Blockchain) LastBlock() *Block {
@@ -140,27 +167,42 @@ func (bc *Blockchain) ProofOfStake() int {
 	//return nonce
 }
 
+func (bc *Blockchain) Mining() bool {
+	bc.AddTransaction(MINING_SENDER, bc.blockchainAddress, 1.0, nil, nil)
+	nonce := bc.ProofOfStake()
+	prevHash := bc.LastBlock().Hash()
+	bc.createBlock(nonce, prevHash)
+	log.Println(" Mining Successful Block Created ⛏️⛏️⛏️")
+	return true
+}
+
+func (bc *Blockchain) verifyTransactionSignature(sender *ecdsa.PublicKey, s *utils.Signature, t *Transaction) bool {
+	m, _ := json.Marshal(t)
+	h := sha256.Sum256([]byte(m))
+	return ecdsa.Verify(sender, h[:], s.R, s.S)
+}
+
 func init() {
 	log.SetPrefix("Blockchain :")
 }
 
 func main() {
-	bc := newBlockchain()
-	log.Println("Block Mined..✅")
-	bc.print()
-	//nonce := bc.ProofOfWork()
-	hash := bc.LastBlock().Hash()
-	bc.createBlock(1, hash)
-	bc.print()
-	nonce := bc.ProofOfStake()
-	bc.AddTransaction("A", "B", 1.0)
-	bc.AddTransaction("A", "B", 2.0)
-	hash = bc.LastBlock().Hash()
-	bc.createBlock(nonce, hash)
-	bc.print()
-	nonce = bc.ProofOfStake()
-	hash = bc.LastBlock().Hash()
-	bc.createBlock(nonce, hash)
-	bc.print()
+	//bc := newBlockchain()
+	//log.Println("Block Mined..✅")
+	//bc.print()
+	////nonce := bc.ProofOfWork()
+	//hash := bc.LastBlock().Hash()
+	//bc.createBlock(1, hash)
+	//bc.print()
+	//nonce := bc.ProofOfStake()
+	//bc.AddTransaction("A", "B", 1.0)
+	//bc.AddTransaction("A", "B", 2.0)
+	//hash = bc.LastBlock().Hash()
+	//bc.createBlock(nonce, hash)
+	//bc.print()
+	//nonce = bc.ProofOfStake()
+	//hash = bc.LastBlock().Hash()
+	//bc.createBlock(nonce, hash)
+	//bc.print()
 
 }
