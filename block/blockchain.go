@@ -29,12 +29,27 @@ type Transaction struct {
 	value                    float32
 }
 
-func NewBlockchain(blockchainAddress string) *Blockchain {
+func NewBlockchain(blockchainAddress string, port uint16) *Blockchain {
 	b := &Block{}
 	bc := new(Blockchain)
 	bc.blockchainAddress = blockchainAddress
 	bc.createBlock(0, b.Hash())
+	bc.port = port
 	return bc
+}
+
+func (b *Block) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Timestamp    int64          `json:"timestamp"`
+		Nonce        int            `json:"nonce"`
+		previousHash string         `json:"previousHash"`
+		Transaction  []*Transaction `json:"transaction"`
+	}{
+		Timestamp:    b.timestamp,
+		Nonce:        b.nonce,
+		previousHash: fmt.Sprintf("%x", b.previousHash),
+		Transaction:  b.transactios,
+	})
 }
 
 func NewTransaction(_sender string, _reciver string, _value float32) *Transaction {
@@ -82,6 +97,7 @@ type Blockchain struct {
 	transactionPool   []*Transaction
 	chain             []*Block
 	blockchainAddress string
+	port              uint16
 }
 
 func newBlockchain() *Blockchain {
@@ -89,6 +105,13 @@ func newBlockchain() *Blockchain {
 	bc := new(Blockchain)
 	bc.createBlock(0, b.Hash())
 	return bc
+}
+func (bc *Blockchain) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Blocks []*Block `json:"chain"`
+	}{
+		Blocks: bc.chain,
+	})
 }
 
 func (bc *Blockchain) print() {

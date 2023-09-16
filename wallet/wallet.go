@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/btcsuite/btcutil/base58"
 	"golang.org/x/crypto/ripemd160"
+	"log"
 )
 
 type Wallet struct {
@@ -24,6 +25,14 @@ type Transaction struct {
 	senderBlockchainAddress    string
 	recipientBlockchainAddress string
 	value                      float32
+}
+
+type TransactionRequest struct {
+	SenderPrivateKey           *string `json:"sender_private_key"`
+	SenderBlockchainAddress    *string `json:"sender_blockchain_address"`
+	RecipientBlockchainAddress *string `json:"recipient_blockchain_address"`
+	SenderPublicKey            *string `json:"sender_public_key"`
+	Value                      *string `json:"value"`
 }
 
 func NewTransaction(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, sender string, recipient string, value float32) *Transaction {
@@ -100,9 +109,22 @@ func (w *Wallet) PrivateKeyStr() string {
 }
 
 func (w *Wallet) PublicKeyStr() string {
-	return fmt.Sprintf("%x%x", w.publicKey.X.Bytes(), w.publicKey.Y.Bytes())
+	return fmt.Sprintf("%064x%064x", w.publicKey.X.Bytes(), w.publicKey.Y.Bytes())
 }
 
 func (w *Wallet) BlockchainAddress() string {
 	return w.blockchainAddress
+}
+
+func (t *TransactionRequest) Validate() bool {
+	log.Println("T", t)
+	if t.SenderBlockchainAddress == nil ||
+		t.SenderPublicKey == nil ||
+		t.RecipientBlockchainAddress == nil ||
+		t.SenderPrivateKey == nil ||
+		t.Value == nil {
+		return false
+	}
+	return true
+
 }
